@@ -1,5 +1,5 @@
-var http = require('http');
-var creds = require('./creds');
+var http = require('https');
+var creds = require('./exports.js');
 
 var order = {
   'account': creds.account,
@@ -13,7 +13,7 @@ var order = {
 
 var options = {
   host: creds.baseUrl,
-  path: '/venues/' + creds.venue + '/stocks/' + creds.stock + '/orders',
+  path: '/ob/api/venues/' + creds.venue + '/stocks/' + creds.stock + '/orders',
   method: 'POST',
   headers: {'X-Starfighter-Authorization': creds.apiToken}
 };
@@ -30,6 +30,11 @@ var callback = function(response) {
 };
 
 var req = http.request(options, callback);
+
+req.on('error', function(e) {
+    console.log('problem: ' + e.message);
+});
+
 // This is the data we are posting, it needs to be a string or a buffer
 req.write(JSON.stringify(order));
 req.end();

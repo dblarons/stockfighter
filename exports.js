@@ -5,5 +5,3 @@ module.exports = {
   baseUrl: 'https://api.stockfighter.io/ob/api',
   account: 'FOOBAR'
 };
-
-
