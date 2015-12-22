@@ -1,0 +1,19 @@
+{
+  "name": "stockfighter",
+  "version": "1.0.0",
+  "description": "CTF",
+  "main": "app.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dblarons/stockfighter.git"
+  },
+  "author": "Aaron and Carl",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dblarons/stockfighter/issues"
+  },
+  "homepage": "https://github.com/dblarons/stockfighter#readme"
+}
