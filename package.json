@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/dblarons/stockfighter/issues"
   },
-  "homepage": "https://github.com/dblarons/stockfighter#readme"
+  "homepage": "https://github.com/dblarons/stockfighter#readme",
+  "dependencies": {
+    "promise": "^7.0.4",
+    "sleep": "^3.0.0"
+  }
 }
