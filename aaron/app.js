@@ -1,13 +1,13 @@
 var http = require('https');
-var creds = require('./exports.js');
-var sleep = require('sleep');
 var Promise = require('promise');
+var creds = require('./exports.js');
 
-var goal = 99999;
-var price = 7893;
-var quantity = 50;
+var goal = 99999 - 8755;
+var price = 9510;
+var quantity = 500;
+var sellQuantity = 25;
 
-var buyOptions = {
+var orderOptions = {
   host: creds.baseUrl,
   path: '/ob/api/venues/' + creds.venue + '/stocks/' + creds.stock + '/orders',
   method: 'POST',
@@ -21,7 +21,7 @@ var marketOptions = {
 };
 
 // Return a promise for a buy command given options and an order.
-var buy = function(options, order) {
+var placeOrder = function(options, order) {
   return new Promise(function(resolve, reject) {
     var req = http.request(options, function(response) {
       var str = '';
@@ -89,6 +89,16 @@ function buyMore(i) {
     'orderType': "limit"
   };
 
+  var sellOrder = {
+    'account': creds.account,
+    'venue': creds.venue,
+    'symbol': creds.stock,
+    'price': 0,
+    'qty': 0,
+    'direction': "sell",
+    'orderType': "limit"
+  };
+
   if (i < 0) {
     console.log('Error: Exceeded goal of ' + goal + ' by ' + Math.abs(i));
   }
@@ -124,10 +134,15 @@ function buyMore(i) {
     console.log('Buying ' + bidSize + ' shares at ' + res.ask + ' when ' + res.askSize + ' are available.');
     buyOrder.price = res.ask;
     buyOrder.qty = bidSize;
-    return buy(buyOptions, buyOrder);
+    sellOrder.price = res.bid;
+    sellOrder.qty = sellQuantity;
+    return placeOrder(orderOptions, buyOrder)
+      .then(placeOrder(orderOptions, sellOrder))
+      .then(placeOrder(orderOptions, sellOrder))
+      .then(placeOrder(orderOptions, sellOrder));
   })
   .then(function(res) {
-    setTimeout(function() {buyMore(i - res.totalFilled);}, 400);
+    setTimeout(function() {buyMore(i - res.totalFilled + sellQuantity * 3);}, 400);
   })
   .catch(function(err) {
     console.log('Error: ' + err);
