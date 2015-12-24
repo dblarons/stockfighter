@@ -70,14 +70,13 @@ var peek = function(options) {
       reject(e.message); // hit an error; reject the promise and clean up
     }); 
 
-    // This is the data we are posting; it needs to be a string or a buffer.
     req.end();
   });
 };
 
-// Buy in quantities of half the askSize while the asking price is at or below
-// our goal price until i is 0. Wait if the asking price is too high or the
-// askSize is too small.
+// Buy in quantities of a size defined by the quantity constant while the
+// asking price is at or below our goal price until i is 0. Wait if the asking
+// price is too high or the askSize is too small.
 function buyMore(i) {
   var buyOrder = {
     'account': creds.account,
