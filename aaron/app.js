@@ -1,6 +1,8 @@
+/* jshint esnext: true */
+
 var http = require('https');
-var Promise = require('promise');
 var creds = require('./exports.js');
+var API = require('../api.js').API;
 
 var goal = 99999 - 8755;
 var price = 9510;
@@ -107,7 +109,7 @@ function buyMore(i) {
     return;
   }
 
-  peek(marketOptions).then(function(res) { 
+  api.getQuote(creds.venueId, creds.stockId).then(res => {
     if (res.ask === undefined) {
       console.log('res.ask was undefined');
       return Promise.resolve({res: i});
@@ -135,15 +137,15 @@ function buyMore(i) {
     buyOrder.qty = bidSize;
     sellOrder.price = res.bid;
     sellOrder.qty = sellQuantity;
-    return placeOrder(orderOptions, buyOrder)
-      .then(placeOrder(orderOptions, sellOrder))
-      .then(placeOrder(orderOptions, sellOrder))
-      .then(placeOrder(orderOptions, sellOrder));
+    return bid(creds.venueId, creds.stockId, price, quantity, 'limit')
+    .then(ask(...))
+    .then(ask(...))
+    .then(ask(...));
   })
-  .then(function(res) {
+  .then(res => {
     setTimeout(function() {buyMore(i - res.totalFilled + sellQuantity * 3);}, 400);
   })
-  .catch(function(err) {
+  .catch(err => {
     console.log('Error: ' + err);
   });
 }

@@ -69,7 +69,7 @@ var tests = [
       api.getOrderStatus(creds.venueId, creds.stockId, res.id).then(res => {
         console.log(res);
         assertEqual(res.ok, true, 'getOrderStatus');
-      }).catch(error => failedRequest('getQuote', error));
+      }).catch(error => failedRequest('getOrderStatus', error));
     });
   },
 ];
