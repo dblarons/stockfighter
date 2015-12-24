@@ -1,7 +1,8 @@
+// TEXTEX and it's stock, FOOBAR, can be used to test the API.
 module.exports = {
   apiToken: 'FOOBAR',
-  venue: 'FOOBAR',
-  stock: 'FOOBAR',
-  baseUrl: 'https://api.stockfighter.io/ob/api',
-  account: 'FOOBAR'
+  venueId: 'TESTEX',
+  stockId: 'FOOBAR',
+  baseUrl: 'api.stockfighter.io',
+  accountId: 'EXB123456'
 };

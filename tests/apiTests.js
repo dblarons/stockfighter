@@ -1,8 +1,7 @@
 /* jshint esnext: true */
 
 var API = require('../api.js').API;
-var creds = require('../aaron/exports.js');
-
+var creds = require('./exports.js');
 
 function assertEqual(actual, expected, name) {
   if (actual === expected) {
@@ -17,22 +16,44 @@ function failedRequest(name, error) {
 }
 
 var tests = [
-  function apiHealthTest(api) {
+  function getApiHealthTest(api) {
     api.getApiHealth().then(res => {
       assertEqual(res.ok, true, 'getApiHealth');
     }).catch(error => failedRequest('getApiHealth', error));
   },
 
-  function venueHealthTest(api, creds) {
+  function getVenueHealthTest(api, creds) {
     api.getVenueHealth(creds.venueId).then(res => {
       assertEqual(res.ok, true, 'getVenueHealth');
     }).catch(error => failedRequest('getVenueHealth', error));
   },
 
-  function stockListTest(api, creds) {
+  function getStockListTest(api, creds) {
     api.getStockList(creds.venueId).then(res => {
-      assertEqual(res.symbols[0].symbol, creds.stockId, 'getStockList');
+      assertEqual(res.ok, true, 'getStockList');
     }).catch(error => failedRequest('getStockList', error));
+  },
+
+  function getOrderbookTest(api, creds) {
+    api.getOrderbook(creds.venueId, creds.stockId).then(res => {
+      assertEqual(res.ok, true, 'getOrderbook');
+    }).catch(error => failedRequest('getStockList', error));
+  },
+
+  function bidTest(api, creds) {
+    var price = 10000;
+    var qty = 1;
+    api.bid(creds.venueId, creds.stockId, price, qty, 'limit').then(res => {
+      assertEqual(res.ok, true, 'bid');
+    }).catch(error => failedRequest('bid', error));
+  },
+
+  function askTest(api, creds) {
+    var price = 0;
+    var qty = 1;
+    api.ask(creds.venueId, creds.stockId, price, qty, 'limit').then(res => {
+      assertEqual(res.ok, true, 'ask');
+    }).catch(error => failedRequest('ask', error));
   }
 ];
 

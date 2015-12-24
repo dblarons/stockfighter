@@ -75,8 +75,20 @@ class API {
     return this.promisify(options);
   }
 
-  // Make a bid on a stock.
-  bid(venueId, stockId, price, qty, orderType) {
+  // Get the orderbook for a particular stock.
+  getOrderbook(venueId, stockId) {
+    const path = `/ob/api/venues/${venueId}/stocks/${stockId}`;
+    const options = {
+      host: this.creds.baseUrl,
+      path: path,
+      method: 'GET',
+      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
+    };
+    return this.promisify(options);
+  }
+
+  // Make a bid on a stock. Prefer to use bid() or ask().
+  placeOrder(venueId, stockId, price, qty, orderType, direction) {
     const path = `/ob/api/venues/${venueId}/stocks/${stockId}/orders`;
     const options = {
       host: this.creds.baseUrl,
@@ -85,9 +97,8 @@ class API {
       headers: {'X-Starfighter-Authorization': this.creds.apiToken}
     };
 
-    const direction = 'buy';
     const order = {
-      'account': this.creds.account,
+      'account': this.creds.accountId,
       'venue': venueId,
       'symbol': stockId,
       'price': price,
@@ -97,6 +108,16 @@ class API {
     };
 
     return this.promisify(options, order);
+  }
+
+  // Make a bid on a stock.
+  bid(venueId, stockId, price, qty, orderType) {
+    return this.placeOrder(venueId, stockId, price, qty, orderType, 'buy');
+  }
+
+  // Offer to sell a stock.
+  ask(venueId, stockId, price, qty, orderType) {
+    return this.placeOrder(venueId, stockId, price, qty, orderType, 'sell');
   }
 }
 
