@@ -54,7 +54,24 @@ var tests = [
     api.ask(creds.venueId, creds.stockId, price, qty, 'limit').then(res => {
       assertEqual(res.ok, true, 'ask');
     }).catch(error => failedRequest('ask', error));
-  }
+  },
+
+  function getQuoteTest(api, creds) {
+    api.getQuote(creds.venueId, creds.stockId).then(res => {
+      assertEqual(res.ok, true, 'getQuote');
+    }).catch(error => failedRequest('getQuote', error));
+  },
+
+  function getOrderStatusTest(api, creds) {
+    var price = 10000;
+    var qty = 1;
+    api.bid(creds.venueId, creds.stockId, price, qty, 'limit').then(res => {
+      api.getOrderStatus(creds.venueId, creds.stockId, res.id).then(res => {
+        console.log(res);
+        assertEqual(res.ok, true, 'getOrderStatus');
+      }).catch(error => failedRequest('getQuote', error));
+    });
+  },
 ];
 
 function runTests() {

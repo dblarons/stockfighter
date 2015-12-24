@@ -119,6 +119,29 @@ class API {
   ask(venueId, stockId, price, qty, orderType) {
     return this.placeOrder(venueId, stockId, price, qty, orderType, 'sell');
   }
+
+  // Get a quick look at the most recent trade information for a stock.
+  getQuote(venueId, stockId) {
+    const path = `/ob/api/venues/${venueId}/stocks/${stockId}/quote`;
+    const options = {
+      host: this.creds.baseUrl,
+      path: path,
+      method: 'GET',
+      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
+    };
+    return this.promisify(options);
+  }
+
+  getOrderStatus(venueId, stockId, orderId) {
+    const path = `/ob/api/venues/${venueId}/stocks/${stockId}/orders/${orderId}`;
+    const options = {
+      host: this.creds.baseUrl,
+      path: path,
+      method: 'GET',
+      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
+    };
+    return this.promisify(options);
+  }
 }
 
 module.exports = {
