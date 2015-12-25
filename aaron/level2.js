@@ -1,6 +1,5 @@
 /* jshint esnext: true */
 
-var http = require('https');
 var creds = require('./exports.js');
 var API = require('../api.js').API;
 
