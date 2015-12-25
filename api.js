@@ -142,6 +142,39 @@ class API {
     };
     return this.promisify(options);
   }
+
+  deleteOrder(venueId, stockId, orderId) {
+    const path = `/ob/api/venues/${venueId}/stocks/${stockId}/orders/${orderId}`;
+    const options = {
+      host: this.creds.baseUrl,
+      path: path,
+      method: 'DELETE',
+      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
+    };
+    return this.promisify(options);
+  }
+
+  getAllOrders(venueId) {
+    const path = `/ob/api/venues/${venueId}/accounts/${this.creds.accountId}/orders`;
+    const options = {
+      host: this.creds.baseUrl,
+      path: path,
+      method: 'GET',
+      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
+    };
+    return this.promisify(options);
+  }
+
+  getAllOrdersForStock(venueId, stockId) {
+    const path = `/ob/api/venues/${venueId}/accounts/${this.creds.accountId}/stocks/${stockId}/orders`;
+    const options = {
+      host: this.creds.baseUrl,
+      path: path,
+      method: 'GET',
+      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
+    };
+    return this.promisify(options);
+  }
 }
 
 module.exports = {

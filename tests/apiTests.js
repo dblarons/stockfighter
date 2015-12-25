@@ -67,10 +67,31 @@ var tests = [
     var qty = 1;
     api.bid(creds.venueId, creds.stockId, price, qty, 'limit').then(res => {
       api.getOrderStatus(creds.venueId, creds.stockId, res.id).then(res => {
-        console.log(res);
         assertEqual(res.ok, true, 'getOrderStatus');
       }).catch(error => failedRequest('getOrderStatus', error));
     });
+  },
+
+  function deleteOrderTest(api, creds) {
+    var price = 10000;
+    var qty = 1;
+    api.bid(creds.venueId, creds.stockId, price, qty, 'limit').then(res => {
+      api.deleteOrder(creds.venueId, creds.stockId, res.id).then(res => {
+        assertEqual(res.ok, true, 'deleteOrder');
+      }).catch(error => failedRequest('deleteOrder', error));
+    });
+  },
+
+  function getAllOrdersTest(api, creds) {
+    api.getAllOrders(creds.venueId).then(res => {
+      assertEqual(res.ok, true, 'getAllOrders');
+    }).catch(error => failedRequest('getAllOrders', error));
+  },
+
+  function getAllOrdersForStockTest(api, creds) {
+    api.getAllOrdersForStock(creds.venueId, creds.stockId).then(res => {
+      assertEqual(res.ok, true, 'getAllOrdersForStock');
+    }).catch(error => failedRequest('getAllOrdersForStock', error));
   },
 ];
 
