@@ -34,9 +34,9 @@ var Maybe = require('monet').Maybe;
 
 // The driver function that makes markets.
 function marketMaker(goal, network, state) {
-  var gm = new GM(creds.apiToken);
-  backOfficeUpdate(gm).then(res => {
+  backOfficeUpdate(network.gm).then(res => {
     var nextState = state.set('backOffice', res);
+    console.log(res);
     marketMaker(goal, network, nextState);
   });
 }
