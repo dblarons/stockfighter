@@ -32,29 +32,44 @@ var Maybe = require('monet').Maybe;
  *  - Stop once net > 10000
  */
 
+var postHeap = new PriorityQueue(comparator: function(a,b) {return a.price - b.price;});
+var boughtHeap = new PriorityQueue(comparator: function(a,b) {return a.price - b.price;});
+var orderedList = [];
+
 // The driver function that makes markets.
 function marketMaker(goal, network, state) {
   api.getQuote(creds.venueid,creds.stockid).then(res => {
+      var position = state.get('backOffice').get('position')
+      var quantity = res.askSize;
+
       if (res.ask === undefined) {
         console.log('res.ask was undefined');
-        return Promise.resolve({res: i});
+        return Promise.resolve({res: i}); // CHANGE
       }
 
-      if (null postHeap && (res.askSize + positions) < 1000) {
-        console.log('Buying ' + res.askSize + ' shares at ' + res.ask + '.');
-        return bid(creds.venueId, creds.stockId, res.ask, res.askSize, 'limit');
+      if (postHeap.length == 0) {
+        if (quantity + position > 1000) {
+            quantity = 1000 - position;
+        }
+        console.log('Buying ' + quantity + ' shares at ' + res.ask + '.');
+        bid(creds.venueId, creds.stockId, res.ask, quantity, 'limit');
+        // Add to order list
       }
 
-      if (null postHeap && positions < 999) {
-        console.log('Buying 1 share at ' + res.ask + '.');
-        return bid(creds.venueId, creds.stockId, res.ask, 1, 'limit');
+      if (postHeap.peek().price <= res.ask) {
+        console.log('Price of ' + res.ask + ' is too high. Wanted a price less than ' + postHeap.peek());
+        return Promise.resolve({res: i}); // CHANGE
       }
 
-      if (postHeap[0] <= res.ask) {
-        console.log('Price of ' + res.ask + ' is too high. Wanted a price less than ' + postHeap[0]);
-        return Promise.resolve({res: i});
+      if (postHeap.peek().price > res.ask) {
+        if (quantity + position > 1000) {
+            quantity = 1000 - position;
+        }
+        console.log('Buying ' + quantity + ' shares at ' + res.ask + '.');
+        bid(creds.venueId, creds.stockId, res.ask, quantity, 'limit');
+        // Add to order list
       }
-  })
+  });
   var gm = new GM(creds.apiToken);
   backOfficeUpdate(gm).then(res => {
     var nextState = state.set('backOffice', res);
