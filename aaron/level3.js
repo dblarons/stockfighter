@@ -5,6 +5,7 @@ var API = require('../api.js').API;
 var Immutable = require('immutable');
 var GM = require('../gm.js');
 var Maybe = require('monet').Maybe;
+var PriorityQueue = require('js-priority-queue');
 
 /*
  * Conditions for when to buy
