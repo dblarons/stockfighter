@@ -32,8 +32,6 @@ var Maybe = require('monet').Maybe;
  *  - Stop once net > 10000
  */
 
-const instanceId = creds.instances.level3;
-
 // Get an update from the back office, if one is available.
 function backOfficeUpdate(gm) {
   return gm.getInstanceStatus(instanceId).then(res => {
@@ -72,11 +70,22 @@ function marketMaker(goal, network, state) {
   });
 }
 
-// API clients for injection.
-var network = {
-  gm: new GM(creds.apiToken),
-  api: new API(creds)
-};
+// Create API clients for injection. API client depends on GM because GM gets
+// the accountId. Network also holds ids specific to this level instance.
+function initNetwork(instanceId) {
+  var gm = new GM(creds.apiToken);
+  return gm.getIds(instanceId).then(ids => {
+    var api = new API(creds, ids.accountId);
+    return {
+      gm: gm,
+      api: api,
+      ids: ids
+    };
+  });
+}
+
+// ID specific to the current level. Does not change.
+const instanceId = creds.instances.level3;
 
 // The initial, immutable, state for our market maker.
 var initState = Immutable.Map({
@@ -91,4 +100,9 @@ var initState = Immutable.Map({
   openAsks: Immutable.List(), // open sell orders
 });
 
-marketMaker(100000, network, initState);
+// Starting point for our application. First, initialize a network object for
+// this instance (gets all ids and initializes API and GM clients), then start
+// making markets.
+initNetwork(instanceId).then(network => {
+  marketMaker(100000, network, initState);
+});

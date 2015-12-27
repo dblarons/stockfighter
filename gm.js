@@ -40,7 +40,8 @@ class GM {
     });
   }
 
-  // Check the health of the API.
+  // Get a status of this instance, including a flash info message and details
+  // about the current trading day and end of world day.
   getInstanceStatus(instanceId) {
     const path = `/gm/instances/${instanceId}`;
     const options = {
@@ -51,6 +52,34 @@ class GM {
     };
     return this.promisify(options);
   } 
+
+  // Get info about this instance, including the accountId, stockId, and
+  // venueId.
+  getInstanceInfo(instanceId) {
+    const path = `/gm/instances/${instanceId}/resume`;
+    const options = {
+      host: this.baseUrl,
+      path: path,
+      method: 'POST',
+      headers: {'X-Starfighter-Authorization': this.apiToken}
+    };
+
+    const body = {
+    };
+
+    return this.promisify(options, body);
+  }
+
+  // Get the ids for a given instanceId.
+  getIds(instanceId) {
+    return this.getInstanceInfo(instanceId).then(res => {
+      return {
+        accountId: res.account,
+        tickers: res.tickers,
+        venues: res.venues
+      };
+    });
+  }
 }
 
 module.exports = GM;

@@ -96,7 +96,7 @@ var tests = [
 ];
 
 function runTests() {
-  var api = new API(creds);
+  var api = new API(creds, creds.accountId);
   tests.map(test => test(api, creds));
 }
 

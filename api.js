@@ -20,8 +20,9 @@
 var http = require('https');
 
 class API {
-  constructor(creds) {
+  constructor(creds, accountId) {
     this.creds = creds;
+    this.accountId = accountId;
   }
 
   // Return an http request wrapped in a Promise object.
@@ -112,7 +113,7 @@ class API {
     };
 
     const order = {
-      'account': this.creds.accountId,
+      'account': this.accountId,
       'venue': venueId,
       'symbol': stockId,
       'price': price,
@@ -169,7 +170,7 @@ class API {
   }
 
   getAllOrders(venueId) {
-    const path = `/ob/api/venues/${venueId}/accounts/${this.creds.accountId}/orders`;
+    const path = `/ob/api/venues/${venueId}/accounts/${this.accountId}/orders`;
     const options = {
       host: this.creds.baseUrl,
       path: path,
@@ -180,7 +181,7 @@ class API {
   }
 
   getAllOrdersForStock(venueId, stockId) {
-    const path = `/ob/api/venues/${venueId}/accounts/${this.creds.accountId}/stocks/${stockId}/orders`;
+    const path = `/ob/api/venues/${venueId}/accounts/${this.accountId}/stocks/${stockId}/orders`;
     const options = {
       host: this.creds.baseUrl,
       path: path,
