@@ -32,6 +32,15 @@ var Maybe = require('monet').Maybe;
  *  - Stop once net > 10000
  */
 
+// The driver function that makes markets.
+function marketMaker(goal, network, state) {
+  var gm = new GM(creds.apiToken);
+  backOfficeUpdate(gm).then(res => {
+    var nextState = state.set('backOffice', res);
+    marketMaker(goal, network, nextState);
+  });
+}
+
 // Get an update from the back office, if one is available.
 function backOfficeUpdate(gm) {
   return gm.getInstanceStatus(instanceId).then(res => {
@@ -60,14 +69,6 @@ function flashParser(msg) {
     position: data[1],
     nav: data[2]
   };
-}
-
-function marketMaker(goal, network, state) {
-  var gm = new GM(creds.apiToken);
-  backOfficeUpdate(gm).then(res => {
-    var nextState = state.set('backOffice', res);
-    marketMaker(goal, network, nextState);
-  });
 }
 
 // Create API clients for injection. API client depends on GM because GM gets
@@ -102,9 +103,12 @@ var initState = Immutable.Map({
   openAsks: Immutable.List(), // open sell orders
 });
 
+// The amount of money we want to make for this level.
+const goal = 1000000;
+
 // Starting point for our application. First, restart the level and initialize
 // a network object for this instance (gets all ids and initializes API and GM
 // clients), then start making markets.
 initNetwork(instanceId).then(network => {
-  marketMaker(100000, network, initState);
+  marketMaker(goal, network, initState);
 });
