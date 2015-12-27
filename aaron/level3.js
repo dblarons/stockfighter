@@ -72,9 +72,11 @@ function marketMaker(goal, network, state) {
 
 // Create API clients for injection. API client depends on GM because GM gets
 // the accountId. Network also holds ids specific to this level instance.
+// Calling initNetwork RESTARTS a level, so it should only be called ONCE at
+// program initialization.
 function initNetwork(instanceId) {
   var gm = new GM(creds.apiToken);
-  return gm.getIds(instanceId).then(ids => {
+  return gm.restart(instanceId).then(ids => {
     var api = new API(creds, ids.accountId);
     return {
       gm: gm,
@@ -100,9 +102,9 @@ var initState = Immutable.Map({
   openAsks: Immutable.List(), // open sell orders
 });
 
-// Starting point for our application. First, initialize a network object for
-// this instance (gets all ids and initializes API and GM clients), then start
-// making markets.
+// Starting point for our application. First, restart the level and initialize
+// a network object for this instance (gets all ids and initializes API and GM
+// clients), then start making markets.
 initNetwork(instanceId).then(network => {
   marketMaker(100000, network, initState);
 });

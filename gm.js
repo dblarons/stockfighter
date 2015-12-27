@@ -55,7 +55,7 @@ class GM {
 
   // Get info about this instance, including the accountId, stockId, and
   // venueId.
-  getInstanceInfo(instanceId) {
+  resume(instanceId) {
     const path = `/gm/instances/${instanceId}/resume`;
     const options = {
       host: this.baseUrl,
@@ -64,15 +64,32 @@ class GM {
       headers: {'X-Starfighter-Authorization': this.apiToken}
     };
 
-    const body = {
-    };
-
-    return this.promisify(options, body);
+    return this.promisify(options, {});
   }
 
   // Get the ids for a given instanceId.
   getIds(instanceId) {
-    return this.getInstanceInfo(instanceId).then(res => {
+    return this.resume(instanceId).then(res => {
+      return {
+        accountId: res.account,
+        tickers: res.tickers,
+        venues: res.venues
+      };
+    });
+  }
+
+  // Restart a level and return the ids for it. To get all level info, call the
+  // resume endpoint.
+  restart(instanceId) {
+    const path = `/gm/instances/${instanceId}/resume`;
+    const options = {
+      host: this.baseUrl,
+      path: path,
+      method: 'POST',
+      headers: {'X-Starfighter-Authorization': this.apiToken}
+    };
+
+    return this.promisify(options, {}).then(res => {
       return {
         accountId: res.account,
         tickers: res.tickers,
