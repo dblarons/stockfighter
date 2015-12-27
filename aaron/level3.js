@@ -34,6 +34,7 @@ var Maybe = require('monet').Maybe;
 
 const instanceId = creds.instances.level3;
 
+// Get an update from the back office, if one is available.
 function backOfficeUpdate(gm) {
   return gm.getInstanceStatus(instanceId).then(res => {
     return Maybe.fromNull(res)
@@ -50,6 +51,8 @@ function backOfficeUpdate(gm) {
   });
 }
 
+// Parse the 'flash' message in the GM hidden endpoint to get the cash,
+// position, and nav from the back office.
 function flashParser(msg) {
   var expr = /((\d+\.\d{2})|\d+)/g;
   var data = msg.match(expr);
@@ -69,11 +72,13 @@ function marketMaker(goal, network, state) {
   });
 }
 
+// API clients for injection.
 var network = {
   gm: new GM(creds.apiToken),
   api: new API(creds)
 };
 
+// The initial, immutable, state for our market maker.
 var initState = Immutable.Map({
   // Summary of holdings.
   backOffice: Immutable.Map({
