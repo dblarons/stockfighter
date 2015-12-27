@@ -18,6 +18,7 @@
   "homepage": "https://github.com/dblarons/stockfighter#readme",
   "dependencies": {
     "immutable": "^3.7.6",
+    "monet": "^0.8.6",
     "promise": "^7.0.4"
   }
 }

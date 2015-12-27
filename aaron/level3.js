@@ -3,6 +3,8 @@
 var creds = require('./exports.js');
 var API = require('../api.js').API;
 var Immutable = require('immutable');
+var GM = require('../gm.js');
+var Maybe = require('monet').Maybe;
 
 /*
  * Conditions for when to buy
@@ -30,13 +32,58 @@ var Immutable = require('immutable');
  *  - Stop once net > 10000
  */
 
-var State = Immutable.Map({
+const instanceId = creds.instances.level3;
+
+function backOfficeUpdate(gm) {
+  return gm.getInstanceStatus(instanceId).then(res => {
+    return Maybe.fromNull(res)
+      .bind(msg => Maybe.fromNull(msg.flash))
+      .bind(flash => Maybe.fromNull(flash.info))
+      .map(flashParser)
+      .orSome({
+        cash: 0,
+        position: 0,
+        nav: 0
+      });
+  }).catch(err => {
+    console.log(err);
+  });
+}
+
+function flashParser(msg) {
+  var expr = /((\d+\.\d{2})|\d+)/g;
+  var data = msg.match(expr);
+
+  return {
+    cash: data[0],
+    position: data[1],
+    nav: data[2]
+  };
+}
+
+function marketMaker(goal, network, state) {
+  var gm = new GM(creds.apiToken);
+  backOfficeUpdate(gm).then(res => {
+    var nextState = state.set('backOffice', res);
+    marketMaker(goal, network, nextState);
+  });
+}
+
+var network = {
+  gm: new GM(creds.apiToken),
+  api: new API(creds)
+};
+
+var initState = Immutable.Map({
   // Summary of holdings.
-  cash: 0,
-  position: 0,
-  nav: 0,
+  backOffice: Immutable.Map({
+    cash: 0,
+    position: 0,
+    nav: 0
+  }),
 
   openBids: Immutable.List(), // open buy orders
   openAsks: Immutable.List(), // open sell orders
-  
 });
+
+marketMaker(100000, network, initState);
