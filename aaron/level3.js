@@ -35,16 +35,34 @@ var PriorityQueue = require('js-priority-queue');
 
 // The driver function that makes markets.
 function marketMaker(goal, network, state) {
-  backOfficeUpdate(network.gm).then(res => {
-    var nextState = state.set('backOffice', res);
-    console.log(res);
-    marketMaker(goal, network, nextState);
-  });
+  // Execute a series of functions that mutate the world state. Last call
+  // should be to marketMaker to repeat the process
+  backOfficeUpdate(network.gm)
+    .then(world => {
+      // Next update or action function goes here.
+    })
+    .then(world => {
+      return marketMaker(world.goal, world.network, world.state);
+    });
 }
 
-// Get an update from the back office, if one is available.
-function backOfficeUpdate(gm) {
-  return gm.getInstanceStatus(instanceId).then(res => {
+// Get an update from the back office, if one is available, and update the
+// world state.
+function backOfficeUpdate(goal, network, state) {
+  // Parse the 'flash' message in the GM hidden endpoint to get the cash,
+  // position, and nav from the back office.
+  var flashParser = function(msg) {
+    var expr = /((\d+\.\d{2})|\d+)/g;
+    var data = msg.match(expr);
+
+    return {
+      cash: data[0],
+      position: data[1],
+      nav: data[2]
+    };
+  };
+
+  return network.gm.getInstanceStatus(instanceId).then(res => {
     return Maybe.fromNull(res)
       .bind(msg => Maybe.fromNull(msg.flash))
       .bind(flash => Maybe.fromNull(flash.info))
@@ -54,22 +72,17 @@ function backOfficeUpdate(gm) {
         position: 0,
         nav: 0
       });
+  }).then(backOffice => {
+    // Update state once transaction is complete
+    var nextState = state.set('backOffice', backOffice);
+    return {
+      goal: goal, 
+      network: network, 
+      state: nextState
+    };
   }).catch(err => {
     console.log(err);
   });
-}
-
-// Parse the 'flash' message in the GM hidden endpoint to get the cash,
-// position, and nav from the back office.
-function flashParser(msg) {
-  var expr = /((\d+\.\d{2})|\d+)/g;
-  var data = msg.match(expr);
-
-  return {
-    cash: data[0],
-    position: data[1],
-    nav: data[2]
-  };
 }
 
 // Create API clients for injection. API client depends on GM because GM gets
