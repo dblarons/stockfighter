@@ -1,6 +1,7 @@
 ### API
 
 ```javascript
+constructor(creds, accountId)
 getApiHealth()
 getVenueHealth(venueId)
 getStockList(venueId)
@@ -12,4 +13,14 @@ getOrderStatus(venueId, stockId, orderId)
 deleteOrder(venueId, stockId, orderId)
 getAllOrders(venueId)
 getAllOrdersForStock(venueId, stockId)
+```
+
+### GM
+
+```javascript
+constructor(apiToken)
+getInstanceStatus(instanceId)
+resume(instanceId)
+getIds(instanceId)
+restart(instanceId)
 ```
