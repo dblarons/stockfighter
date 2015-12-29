@@ -25,6 +25,15 @@ class API {
     this.accountId = accountId;
   }
 
+  options(method, path) {
+    return {
+      host: this.creds.baseUrl,
+      path: path,
+      method: method,
+      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
+    };
+  }
+
   // Return an http request wrapped in a Promise object.
   promisify(options, body) {
     return new Promise(function(resolve, reject) {
@@ -57,61 +66,30 @@ class API {
   // Check the health of the API.
   getApiHealth() {
     const path = `/ob/api/heartbeat`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'GET',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('GET', path));
   }
 
   // Check the health of a venue.
   getVenueHealth(venueId) {
     const path = `/ob/api/venues/${venueId}/heartbeat`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'GET',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('GET', path));
   }
 
   // List the stocks available for trading on a venue.
   getStockList(venueId) {
     const path = `/ob/api/venues/${venueId}/stocks`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'GET',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('GET', path));
   }
 
   // Get the orderbook for a particular stock.
   getOrderbook(venueId, stockId) {
     const path = `/ob/api/venues/${venueId}/stocks/${stockId}`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'GET',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('GET', path));
   }
 
   // Make a bid on a stock. Prefer to use bid() or ask().
   placeOrder(venueId, stockId, price, qty, orderType, direction) {
     const path = `/ob/api/venues/${venueId}/stocks/${stockId}/orders`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'POST',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-
     const order = {
       'account': this.accountId,
       'venue': venueId,
@@ -122,7 +100,7 @@ class API {
       'orderType': orderType
     };
 
-    return this.promisify(options, order);
+    return this.promisify(this.options('POST', path), order);
   }
 
   // Make a bid on a stock.
@@ -138,57 +116,31 @@ class API {
   // Get a quick look at the most recent trade information for a stock.
   getQuote(venueId, stockId) {
     const path = `/ob/api/venues/${venueId}/stocks/${stockId}/quote`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'GET',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('GET', path));
   }
 
+  // Get a status for an existing order.
   getOrderStatus(venueId, stockId, orderId) {
     const path = `/ob/api/venues/${venueId}/stocks/${stockId}/orders/${orderId}`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'GET',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('GET', path));
   }
 
+  // Cancel an order.
   deleteOrder(venueId, stockId, orderId) {
     const path = `/ob/api/venues/${venueId}/stocks/${stockId}/orders/${orderId}`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'DELETE',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('DELETE', path));
   }
 
+  // Get statuses for all market orders on all stocks.
   getAllOrders(venueId) {
     const path = `/ob/api/venues/${venueId}/accounts/${this.accountId}/orders`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'GET',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('GET', path));
   }
 
+  // Get the statuses for all orders on a particular stock.
   getAllOrdersForStock(venueId, stockId) {
     const path = `/ob/api/venues/${venueId}/accounts/${this.accountId}/stocks/${stockId}/orders`;
-    const options = {
-      host: this.creds.baseUrl,
-      path: path,
-      method: 'GET',
-      headers: {'X-Starfighter-Authorization': this.creds.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('GET', path));
   }
 }
 

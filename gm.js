@@ -11,6 +11,15 @@ class GM {
     this.apiToken = apiToken;
   }
 
+  options(method, path) {
+    return {
+      host: this.baseUrl,
+      path: path,
+      method: method,
+      headers: {'X-Starfighter-Authorization': this.apiToken}
+    };
+  }
+
   // Return an http request wrapped in a Promise object.
   promisify(options, body) {
     return new Promise(function(resolve, reject) {
@@ -44,27 +53,14 @@ class GM {
   // about the current trading day and end of world day.
   getInstanceStatus(instanceId) {
     const path = `/gm/instances/${instanceId}`;
-    const options = {
-      host: this.baseUrl,
-      path: path,
-      method: 'GET',
-      headers: {'X-Starfighter-Authorization': this.apiToken}
-    };
-    return this.promisify(options);
+    return this.promisify(this.options('GET', path));
   } 
 
   // Get info about this instance, including the accountId, stockId, and
   // venueId.
   resume(instanceId) {
     const path = `/gm/instances/${instanceId}/resume`;
-    const options = {
-      host: this.baseUrl,
-      path: path,
-      method: 'POST',
-      headers: {'X-Starfighter-Authorization': this.apiToken}
-    };
-
-    return this.promisify(options, {});
+    return this.promisify(this.options('POST', path), {});
   }
 
   // Get the ids for a given instanceId.
@@ -82,14 +78,7 @@ class GM {
   // resume endpoint.
   restart(instanceId) {
     const path = `/gm/instances/${instanceId}/restart`;
-    const options = {
-      host: this.baseUrl,
-      path: path,
-      method: 'POST',
-      headers: {'X-Starfighter-Authorization': this.apiToken}
-    };
-
-    return this.promisify(options, {}).then(res => {
+    return this.promisify(this.options('POST', path), {}).then(res => {
       return {
         accountId: res.account,
         tickers: res.tickers,
