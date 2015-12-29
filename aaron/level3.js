@@ -47,6 +47,8 @@ function marketMaker(world) {
     .then(getQuote)
     .then(updateOpenOrders)
     .then(deleteStaleOrders)
+    .then(submitBid)
+    .then(submitAsk)
     .then(marketMaker); // repeat process
 }
 
@@ -207,6 +209,14 @@ function deleteStaleOrders(world) {
   }).catch(err => {
       console.log("Error thrown in level3->deleteStaleOrders: " + err);
   });
+}
+
+function submitBid(world) {
+  return Promise.resolve(world);
+}
+
+function submitAsk(world) {
+  return Promise.resolve(world);
 }
 
 // Create API clients for injection. API client depends on GM because GM gets
