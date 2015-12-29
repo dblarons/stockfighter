@@ -35,16 +35,13 @@ var PriorityQueue = require('js-priority-queue');
 
 // The driver function that makes markets.
 function marketMaker(world) {
-  // Only one stockId and venueId in this level, so use a shorter name.
-  var stockId = network.ids.tickers[0];
-  var venueId = network.ids.venues[0];
-
   // Execute a series of functions that mutate the world state. Last call
   // should be to marketMaker to repeat the process. All functions passed to
   // .then() should take a single, world, parameter that contains goal,
   // network, and state. It should then return a world for the next handler.
   backOfficeUpdate(world)
     .then(getQuote)
+    .then(updateOpenOrders)
     .then(marketMaker); // repeat process
 }
 
@@ -91,6 +88,9 @@ function backOfficeUpdate(world) {
 // with details from the exchange. Remember, this quote is _already_ out of
 // date.
 function getQuote(world) {
+  var venueId = world.network.ids.venues[0];
+  var stockId = world.network.ids.tickers[0];
+
   network.api.getQuote(venueId, stockId).then(res => {
     var oldBid = world.state.bid;
     var oldAsk = world.state.ask;
@@ -111,9 +111,48 @@ function getQuote(world) {
   });
 }
 
-// Update the 
+// Update all open orders whose ids we have kept.
 function updateOpenOrders(world) {
-  
+  var venueId = world.network.ids.venues[0];
+  var stockId = world.network.ids.tickers[0];
+
+  var update = function(orders) {
+    return Promise.all(orders.map(order => {
+      // Get the latest (already outdated...) data for our orders.
+      return getOrderStatus(venueId, stockId, order.id).then(res => {
+        return {
+          id: order.id,
+          status: res
+        };
+      });
+    })).then(updatedOrders => {
+      // Remove orders that have been filled.
+      return updatedOrders.reduce((acc, x) => {
+        if (x.status.qty === 0) {
+          return acc; // order is filled
+        } else {
+          return acc.push(x); // keep track of unfilled orders
+        }
+      }, Immutable.List()); 
+    });
+  };
+
+  var openBids = world.state.openBids; // immutable
+  var openAsks = world.state.openAsks; // immutable
+
+  Promise.all([update(openBids), update(openAsks)]).then(updated => {
+    // Update order statuses if they are available.
+    var nextState = world.state.merge({
+      'openBids': updated[0],
+      'openAsks': updated[1],
+    });
+
+    return {
+      goal: world.goal,
+      network: world.network,
+      state: nextState
+    };
+  });
 }
 
 // Create API clients for injection. API client depends on GM because GM gets
