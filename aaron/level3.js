@@ -101,11 +101,8 @@ function backOfficeUpdate(world) {
   }).then(backOffice => {
     // Update state once transaction is complete
     var nextState = world.state.set('backOffice', backOffice);
-    return {
-      goal: world.goal,
-      network: world.network,
-      state: nextState
-    };
+    world.state = nextState;
+    return world;
   }).catch(err => {
     console.log("Error thrown in level3->backOfficeUpdate: " + err);
   });
@@ -129,11 +126,8 @@ function getQuote(world) {
       'ask': maybeRes.bind(r => Maybe.fromNull(r.ask)).orSome(oldAsk),
     });
 
-    return {
-      goal: world.goal,
-      network: world.network,
-      state: nextState
-    };
+    world.state = nextState;
+    return world;
   }).catch(err => {
     console.log("Error thrown in level3->getQuote: " + err);
   });
@@ -176,12 +170,8 @@ function updateOpenOrders(world) {
       'openBids': updated[0],
       'openAsks': updated[1],
     });
-
-    return {
-      goal: world.goal,
-      network: world.network,
-      state: nextState
-    };
+    world.state = nextState;
+    return world;
   });
 }
 
@@ -261,6 +251,11 @@ function initNetwork(instanceId) {
 // ID specific to the current level. Does not change.
 const instanceId = creds.instances.level3;
 
+// a is first if a is less than b
+var minHeap = function(a, b) {
+  return a.price - b.price;
+};
+
 // The initial, immutable, state for our market maker.
 var initState = Immutable.Map({
   // Summary of holdings.
@@ -273,9 +268,22 @@ var initState = Immutable.Map({
   bid: 0, // bid price on the market as of last sync
   ask: 0, // ask price on the market as of last sync
 
+  // [{id: 1, status: {...}}, {...}]
   openBids: Immutable.List(), // open buy orders
   openAsks: Immutable.List(), // open sell orders
 });
+
+// A mutable data structure representing our back office inventory.
+var initInventory = {
+  // MinHeap of all the stock in our inventory, prioritized by the purchase
+  // price. There may be multiple orders at the same price.
+  // PQ([{price: 5000, qty: 10, id: 123}])
+  ownedHeap: new PriorityQueue({comparator: minHeap}),
+
+  // Count of how many shares we own; currently used for sanity checking with
+  // the back office.
+  count: 0
+};
 
 // The amount of money we want to make for this level.
 const goal = 1000000;
@@ -287,7 +295,8 @@ initNetwork(instanceId).then(network => {
   var world = {
     goal: goal,
     network: network,
-    state: initState
+    state: initState,
+    inventory: initInventory
   };
   marketMaker(world);
 });
