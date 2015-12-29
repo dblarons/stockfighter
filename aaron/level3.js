@@ -49,7 +49,10 @@ function marketMaker(world) {
     .then(deleteStaleOrders)
     .then(submitBid)
     .then(submitAsk)
-    .then(marketMaker); // repeat process
+    .then(marketMaker)
+    .catch(err => {
+      console.log('Error caught in marketMaker: ' + err);
+    }); // repeat process
 }
 
 // Get an update from the back office, if one is available, and update the
@@ -98,9 +101,9 @@ function getQuote(world) {
   var venueId = world.network.ids.venues[0];
   var stockId = world.network.ids.tickers[0];
 
-  network.api.getQuote(venueId, stockId).then(res => {
-    var oldBid = world.state.bid;
-    var oldAsk = world.state.ask;
+  return world.network.api.getQuote(venueId, stockId).then(res => {
+    var oldBid = world.state.get('bid');
+    var oldAsk = world.state.get('ask');
     var maybeRes = Maybe.Some(res);
 
     // Update new bid / ask prices if they are available.
@@ -108,6 +111,7 @@ function getQuote(world) {
       'bid': maybeRes.bind(r => Maybe.fromNull(r.bid)).orSome(oldBid),
       'ask': maybeRes.bind(r => Maybe.fromNull(r.ask)).orSome(oldAsk),
     });
+
     return {
       goal: world.goal,
       network: world.network,
@@ -146,10 +150,10 @@ function updateOpenOrders(world) {
     });
   };
 
-  var openBids = world.state.openBids; // immutable
-  var openAsks = world.state.openAsks; // immutable
+  var openBids = world.state.get('openBids'); // immutable
+  var openAsks = world.state.get('openAsks'); // immutable
 
-  Promise.all([update(openBids), update(openAsks)]).then(updated => {
+  return Promise.all([update(openBids), update(openAsks)]).then(updated => {
     // Update order statuses if they are available.
     var nextState = world.state.merge({
       'openBids': updated[0],
@@ -168,11 +172,11 @@ function updateOpenOrders(world) {
 // openBids and openAsks after they are deleted because they are not used after
 // this point and deletion orders cannot be confirmed anyways.
 function deleteStaleOrders(world) {
-  var openBids = world.state.openBids; // immutable
-  var openAsks = world.state.openAsks; // immutable
+  var openBids = world.state.get('openBids'); // immutable
+  var openAsks = world.state.get('openAsks'); // immutable
 
-  var bid = world.state.bid;
-  var ask = world.state.ask;
+  var bid = world.state.get('bid');
+  var ask = world.state.get('ask');
 
   var isStaleBid = function(bidOrder) {
     // Return true if the bid should be deleted.
@@ -232,6 +236,8 @@ function initNetwork(instanceId) {
       api: api,
       ids: ids
     };
+  }).catch(err => {
+    console.log('Error in initNetwork: ' + err);
   });
 }
 
