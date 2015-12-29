@@ -189,7 +189,7 @@ function deleteStaleOrders(world) {
 
   var remove = function(orders) {
     return Promise.all(orders.map(order => {
-      // Get the latest (already outdated...) data for our orders.
+      // Submit a delete request (that may or may not actually be filled).
       return deleteOrder(venueId, stockId, order.id).then(res => {
         return {
           id: order.id,
