@@ -33,6 +33,10 @@ var PriorityQueue = require('js-priority-queue');
  *  - Stop once net > 10000
  */
 
+// Amount that a bid or ask price is allowed to deviate from the norm bid or
+// ask before deletion.
+var buffer = 50;
+
 // The driver function that makes markets.
 function marketMaker(world) {
   // Execute a series of functions that mutate the world state. Last call
@@ -42,6 +46,7 @@ function marketMaker(world) {
   backOfficeUpdate(world)
     .then(getQuote)
     .then(updateOpenOrders)
+    .then(deleteStaleOrders)
     .then(marketMaker); // repeat process
 }
 
@@ -134,6 +139,8 @@ function updateOpenOrders(world) {
           return acc.push(x); // keep track of unfilled orders
         }
       }, Immutable.List()); 
+    }).catch(err => {
+      console.log("Error thrown in level3->updateOpenOrders->update: " + err);
     });
   };
 
@@ -152,6 +159,53 @@ function updateOpenOrders(world) {
       network: world.network,
       state: nextState
     };
+  });
+}
+
+// Delete orders that have no chance of being filled. No need to update the
+// openBids and openAsks after they are deleted because they are not used after
+// this point and deletion orders cannot be confirmed anyways.
+function deleteStaleOrders(world) {
+  var openBids = world.state.openBids; // immutable
+  var openAsks = world.state.openAsks; // immutable
+
+  var bid = world.state.bid;
+  var ask = world.state.ask;
+
+  var isStaleBid = function(bidOrder) {
+    // Return true if the bid should be deleted.
+    var currPrice = bidOrder.status.price;
+    return currPrice < bid - buffer || currPrice > ask;
+  };
+
+  var isStaleAsk = function(askOrder) {
+    // Return true if the ask should be deleted.
+    var currPrice = askOrder.status.price;
+    return currPrice > ask + buffer || currPrice < bid;
+  };
+
+  var staleBids = openBids.filter(isStaleBid);
+  var staleAsks = openAsks.filter(isStaleAsk);
+
+  var remove = function(orders) {
+    return Promise.all(orders.map(order => {
+      // Get the latest (already outdated...) data for our orders.
+      return deleteOrder(venueId, stockId, order.id).then(res => {
+        return {
+          id: order.id,
+          status: res
+        };
+      });
+    }));
+  };
+
+  return Promise.all([remove(staleBids), remove(staleAsks)]).then(res => {
+    // Return an old, naive world, which has not been updated with the deleted
+    // orders because it would be no use waiting to find out if those deletions
+    // were acted upon or not.
+    return world;
+  }).catch(err => {
+      console.log("Error thrown in level3->deleteStaleOrders: " + err);
   });
 }
 
