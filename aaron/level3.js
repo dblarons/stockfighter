@@ -49,10 +49,27 @@ function marketMaker(world) {
     .then(deleteStaleOrders)
     .then(submitBid)
     .then(submitAsk)
+    .then(logger)
     .then(marketMaker)
     .catch(err => {
       console.log('Error caught in marketMaker: ' + err);
     }); // repeat process
+}
+
+// Log out useful information about the world.
+function logger(world) {
+  var cash = world.state.get('backOffice').get('cash');
+  var position = world.state.get('backOffice').get('position');
+  var nav = world.state.get('backOffice').get('nav');
+  var bid = world.state.get('bid');
+  var ask = world.state.get('ask');
+  var venueId = world.network.ids.venues[0];
+  var stockId = world.network.ids.tickers[0];
+  console.log('\n ---- World ----');
+  console.log(`venue: ${venueId} | stock: ${stockId}`);
+  console.log(`bid: ${bid} | ask: ${ask}`);
+  console.log(`cash: ${cash} | position: ${position} | nav: ${nav}`);
+  return Promise.resolve(world);
 }
 
 // Get an update from the back office, if one is available, and update the
@@ -61,14 +78,14 @@ function backOfficeUpdate(world) {
   // Parse the 'flash' message in the GM hidden endpoint to get the cash,
   // position, and nav from the back office.
   var flashParser = function(msg) {
-    var expr = /((\d+\.\d{2})|\d+)/g;
+    var expr = /((-?\d+\.\d{2})|-?\d+)/g;
     var data = msg.match(expr);
 
-    return {
-      cash: data[0],
-      position: data[1],
-      nav: data[2]
-    };
+    return Immutable.Map({
+      cash: parseFloat(data[0]),
+      position: parseFloat(data[1]),
+      nav: parseFloat(data[2])
+    });
   };
 
   return world.network.gm.getInstanceStatus(instanceId).then(res => {
@@ -76,11 +93,11 @@ function backOfficeUpdate(world) {
       .bind(msg => Maybe.fromNull(msg.flash))
       .bind(flash => Maybe.fromNull(flash.info))
       .map(flashParser)
-      .orSome({
+      .orSome(Immutable.Map({
         cash: 0,
         position: 0,
         nav: 0
-      });
+      }));
   }).then(backOffice => {
     // Update state once transaction is complete
     var nextState = world.state.set('backOffice', backOffice);
