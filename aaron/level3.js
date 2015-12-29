@@ -1,7 +1,7 @@
 /* jshint esnext: true */
 
 var creds = require('./exports.js');
-var API = require('../api.js').API;
+var API = require('../api.js');
 var Immutable = require('immutable');
 var GM = require('../gm.js');
 var Maybe = require('monet').Maybe;
@@ -33,8 +33,6 @@ var PriorityQueue = require('js-priority-queue');
  *  - Stop once net > 10000
  */
 
-
-
 // The driver function that makes markets.
 function marketMaker(world) {
   // Only one stockId and venueId in this level, so use a shorter name.
@@ -50,9 +48,20 @@ function marketMaker(world) {
     .then(marketMaker); // repeat process
 }
 
+// Get a quote for the stock we're market making and update our internal state
+// with details from the exchange. Remember, this quote is _already_ out of
+// date.
 function quoteUpdate(world) {
   network.api.getQuote(venueId, stockId).then(res => {
+    var oldBid = world.state.bid;
+    var oldAsk = world.state.ask;
+    var maybeRes = Maybe.Some(res);
 
+    // Update new bid / ask prices if they are available.
+    world.state = world.state.merge({
+      'bid': maybeRes.bind(r => Maybe.fromNull(r.bid)).orSome(oldBid),
+      'ask': maybeRes.bind(r => Maybe.fromNull(r.ask)).orSome(oldAsk),
+    });
   });
 }
 
@@ -122,6 +131,9 @@ var initState = Immutable.Map({
     position: 0,
     nav: 0
   }),
+
+  bid: 0, // bid price on the market as of last sync
+  ask: 0, // ask price on the market as of last sync
 
   openBids: Immutable.List(), // open buy orders
   openAsks: Immutable.List(), // open sell orders

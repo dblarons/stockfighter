@@ -1,7 +1,7 @@
 /* jshint esnext: true */
 
 var creds = require('./exports.js');
-var API = require('../api.js').API;
+var API = require('../api.js');
 var Immutable = require('immutable');
 var GM = require('../gm.js');
 var Maybe = require('monet').Maybe;

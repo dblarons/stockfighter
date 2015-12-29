@@ -192,6 +192,4 @@ class API {
   }
 }
 
-module.exports = {
-  API: API
-};
+module.exports = API;
