@@ -81,7 +81,7 @@ class GM {
   // Restart a level and return the ids for it. To get all level info, call the
   // resume endpoint.
   restart(instanceId) {
-    const path = `/gm/instances/${instanceId}/resume`;
+    const path = `/gm/instances/${instanceId}/restart`;
     const options = {
       host: this.baseUrl,
       path: path,
