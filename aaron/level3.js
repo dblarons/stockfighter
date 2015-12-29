@@ -33,22 +33,32 @@ var PriorityQueue = require('js-priority-queue');
  *  - Stop once net > 10000
  */
 
+
+
 // The driver function that makes markets.
-function marketMaker(goal, network, state) {
+function marketMaker(world) {
+  // Only one stockId and venueId in this level, so use a shorter name.
+  var stockId = network.ids.tickers[0];
+  var venueId = network.ids.venues[0];
+
   // Execute a series of functions that mutate the world state. Last call
-  // should be to marketMaker to repeat the process
-  backOfficeUpdate(network.gm)
-    .then(world => {
-      // Next update or action function goes here.
-    })
-    .then(world => {
-      return marketMaker(world.goal, world.network, world.state);
-    });
+  // should be to marketMaker to repeat the process. All functions passed to
+  // .then() should take a single, world, parameter that contains goal,
+  // network, and state. It should then return a world for the next handler.
+  backOfficeUpdate(world)
+    .then(quoteUpdate)
+    .then(marketMaker); // repeat process
+}
+
+function quoteUpdate(world) {
+  network.api.getQuote(venueId, stockId).then(res => {
+
+  });
 }
 
 // Get an update from the back office, if one is available, and update the
 // world state.
-function backOfficeUpdate(goal, network, state) {
+function backOfficeUpdate(world) {
   // Parse the 'flash' message in the GM hidden endpoint to get the cash,
   // position, and nav from the back office.
   var flashParser = function(msg) {
@@ -62,7 +72,7 @@ function backOfficeUpdate(goal, network, state) {
     };
   };
 
-  return network.gm.getInstanceStatus(instanceId).then(res => {
+  return world.network.gm.getInstanceStatus(instanceId).then(res => {
     return Maybe.fromNull(res)
       .bind(msg => Maybe.fromNull(msg.flash))
       .bind(flash => Maybe.fromNull(flash.info))
@@ -74,10 +84,10 @@ function backOfficeUpdate(goal, network, state) {
       });
   }).then(backOffice => {
     // Update state once transaction is complete
-    var nextState = state.set('backOffice', backOffice);
+    var nextState = world.state.set('backOffice', backOffice);
     return {
-      goal: goal, 
-      network: network, 
+      goal: world.goal,
+      network: world.network,
       state: nextState
     };
   }).catch(err => {
@@ -124,5 +134,10 @@ const goal = 1000000;
 // a network object for this instance (gets all ids and initializes API and GM
 // clients), then start making markets.
 initNetwork(instanceId).then(network => {
-  marketMaker(goal, network, initState);
+  var world = {
+    goal: goal,
+    network: network,
+    state: initState
+  };
+  marketMaker(world);
 });

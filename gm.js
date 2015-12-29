@@ -72,8 +72,8 @@ class GM {
     return this.resume(instanceId).then(res => {
       return {
         accountId: res.account,
-        tickers: res.tickers,
-        venues: res.venues
+        tickers: res.tickers, // tickers is an array of stockIds
+        venues: res.venues // venues is an array of venueIds
       };
     });
   }
