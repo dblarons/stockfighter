@@ -44,25 +44,8 @@ function marketMaker(world) {
   // .then() should take a single, world, parameter that contains goal,
   // network, and state. It should then return a world for the next handler.
   backOfficeUpdate(world)
-    .then(quoteUpdate)
+    .then(getQuote)
     .then(marketMaker); // repeat process
-}
-
-// Get a quote for the stock we're market making and update our internal state
-// with details from the exchange. Remember, this quote is _already_ out of
-// date.
-function quoteUpdate(world) {
-  network.api.getQuote(venueId, stockId).then(res => {
-    var oldBid = world.state.bid;
-    var oldAsk = world.state.ask;
-    var maybeRes = Maybe.Some(res);
-
-    // Update new bid / ask prices if they are available.
-    world.state = world.state.merge({
-      'bid': maybeRes.bind(r => Maybe.fromNull(r.bid)).orSome(oldBid),
-      'ask': maybeRes.bind(r => Maybe.fromNull(r.ask)).orSome(oldAsk),
-    });
-  });
 }
 
 // Get an update from the back office, if one is available, and update the
@@ -100,8 +83,37 @@ function backOfficeUpdate(world) {
       state: nextState
     };
   }).catch(err => {
-    console.log(err);
+    console.log("Error thrown in level3->backOfficeUpdate: " + err);
   });
+}
+
+// Get a quote for the stock we're market making and update our internal state
+// with details from the exchange. Remember, this quote is _already_ out of
+// date.
+function getQuote(world) {
+  network.api.getQuote(venueId, stockId).then(res => {
+    var oldBid = world.state.bid;
+    var oldAsk = world.state.ask;
+    var maybeRes = Maybe.Some(res);
+
+    // Update new bid / ask prices if they are available.
+    var nextState = world.state.merge({
+      'bid': maybeRes.bind(r => Maybe.fromNull(r.bid)).orSome(oldBid),
+      'ask': maybeRes.bind(r => Maybe.fromNull(r.ask)).orSome(oldAsk),
+    });
+    return {
+      goal: world.goal,
+      network: world.network,
+      state: nextState
+    };
+  }).catch(err => {
+    console.log("Error thrown in level3->getQuote: " + err);
+  });
+}
+
+// Update the 
+function updateOpenOrders(world) {
+  
 }
 
 // Create API clients for injection. API client depends on GM because GM gets
