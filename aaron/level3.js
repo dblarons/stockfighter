@@ -1,4 +1,7 @@
 /* jshint esnext: true */
+/* jshint node: true */
+
+"use strict";
 
 var creds = require('./exports.js');
 var API = require('../api.js');
@@ -37,6 +40,12 @@ var PriorityQueue = require('js-priority-queue');
 // ask before deletion.
 var buffer = 50;
 
+// Highest number of shares you can be positioned with in either direction.
+var positionLimit = 1000;
+
+// ID specific to the current level. Does not change.
+const instanceId = creds.instances.level3;
+
 // The driver function that makes markets.
 function marketMaker(world) {
   // Execute a series of functions that mutate the world state. Last call
@@ -58,17 +67,22 @@ function marketMaker(world) {
 
 // Log out useful information about the world.
 function logger(world) {
+  var venueId = world.network.ids.venues[0];
+  var stockId = world.network.ids.tickers[0];
+  var bid = world.state.get('bid');
+  var ask = world.state.get('ask');
   var cash = world.state.get('backOffice').get('cash');
   var position = world.state.get('backOffice').get('position');
   var nav = world.state.get('backOffice').get('nav');
-  var bid = world.state.get('bid');
-  var ask = world.state.get('ask');
-  var venueId = world.network.ids.venues[0];
-  var stockId = world.network.ids.tickers[0];
+  var iCash = world.inventory.cash;
+  var iPosition = world.inventory.position;
+  var iNav = world.inventory.nav(world.state.get('last'));
+  var delta = iPosition - position;
   console.log('\n ---- World ----');
   console.log(`venue: ${venueId} | stock: ${stockId}`);
   console.log(`bid: ${bid} | ask: ${ask}`);
   console.log(`cash: ${cash} | position: ${position} | nav: ${nav}`);
+  console.log(`INTERNAL cash: ${iCash} | position: ${iPosition} | nav: ${iNav} | delta: ${delta}`);
   return Promise.resolve(world);
 }
 
@@ -118,18 +132,33 @@ function getQuote(world) {
   return world.network.api.getQuote(venueId, stockId).then(res => {
     var oldBid = world.state.get('bid');
     var oldAsk = world.state.get('ask');
+    var oldLast = world.state.get('last');
     var maybeRes = Maybe.Some(res);
 
     // Update new bid / ask prices if they are available.
     var nextState = world.state.merge({
       'bid': maybeRes.bind(r => Maybe.fromNull(r.bid)).orSome(oldBid),
       'ask': maybeRes.bind(r => Maybe.fromNull(r.ask)).orSome(oldAsk),
+      'last': maybeRes.bind(r => Maybe.fromNull(r.last)).orSome(oldLast)
     });
 
     world.state = nextState;
     return world;
   }).catch(err => {
     console.log("Error thrown in level3->getQuote: " + err);
+  });
+}
+
+// If there are new fills available, update position and cash in the internal
+// back office and add the fill to our ownedHeap.
+function updateInventory(oldStatus, newStatus, world) {
+  newStatus.fills.slice(oldStatus.fills.length).forEach(fill => {
+    world.inventory.purchase(newStatus.direction, fill.qty, fill.price);
+    world.inventory.ownedHeap.queue({
+      price: fill.price,
+      qty: fill.qty,
+      id: newStatus.id
+    });
   });
 }
 
@@ -141,7 +170,9 @@ function updateOpenOrders(world) {
   var update = function(orders) {
     return Promise.all(orders.map(order => {
       // Get the latest (already outdated...) data for our orders.
-      return getOrderStatus(venueId, stockId, order.id).then(res => {
+      return world.network.api.getOrderStatus(venueId, stockId, order.id).then(res => {
+        updateInventory(orders.status, res, world); // MUTATION: update internal inventory
+        console.log(world.inventory);
         return {
           id: order.id,
           status: res
@@ -168,7 +199,7 @@ function updateOpenOrders(world) {
     // Update order statuses if they are available.
     var nextState = world.state.merge({
       'openBids': updated[0],
-      'openAsks': updated[1],
+      'openAsks': updated[1]
     });
     world.state = nextState;
     return world;
@@ -179,6 +210,9 @@ function updateOpenOrders(world) {
 // openBids and openAsks after they are deleted because they are not used after
 // this point and deletion orders cannot be confirmed anyways.
 function deleteStaleOrders(world) {
+  var venueId = world.network.ids.venues[0];
+  var stockId = world.network.ids.tickers[0];
+
   var openBids = world.state.get('openBids'); // immutable
   var openAsks = world.state.get('openAsks'); // immutable
 
@@ -203,7 +237,7 @@ function deleteStaleOrders(world) {
   var remove = function(orders) {
     return Promise.all(orders.map(order => {
       // Submit a delete request (that may or may not actually be filled).
-      return deleteOrder(venueId, stockId, order.id).then(res => {
+      return world.network.api.deleteOrder(venueId, stockId, order.id).then(res => {
         return {
           id: order.id,
           status: res
@@ -248,13 +282,6 @@ function initNetwork(instanceId) {
   });
 }
 
-// ID specific to the current level. Does not change.
-const instanceId = creds.instances.level3;
-
-// a is first if a is less than b
-var minHeap = function(a, b) {
-  return a.price - b.price;
-};
 
 // The initial, immutable, state for our market maker.
 var initState = Immutable.Map({
@@ -267,6 +294,7 @@ var initState = Immutable.Map({
 
   bid: 0, // bid price on the market as of last sync
   ask: 0, // ask price on the market as of last sync
+  last: 0, // last sale price on the market
 
   // [{id: 1, status: {...}}, {...}]
   openBids: Immutable.List(), // open buy orders
@@ -274,16 +302,38 @@ var initState = Immutable.Map({
 });
 
 // A mutable data structure representing our back office inventory.
-var initInventory = {
-  // MinHeap of all the stock in our inventory, prioritized by the purchase
-  // price. There may be multiple orders at the same price.
-  // PQ([{price: 5000, qty: 10, id: 123}])
-  ownedHeap: new PriorityQueue({comparator: minHeap}),
+class Inventory {
+  constructor() {
+    this.cash = 0; // amount of cash spent or owned
+    this.position = 0; // number of shares currently owned
 
-  // Count of how many shares we own; currently used for sanity checking with
-  // the back office.
-  count: 0
-};
+    // MinHeap of all the stock in our inventory, prioritized by the purchase
+    // price. There may be multiple orders at the same price.
+    // PQ([{price: 5000, qty: 10, id: 123}])
+    this.ownedHeap = new PriorityQueue({comparator: this.minHeap});
+  }
+
+  // a is first if a is less than b
+  static minHeap(a, b) {
+    return a.price - b.price;
+  }
+
+  // Use position, cash, and last sale price to calculate nav.
+  nav(last) {
+    return this.cash + this.position * last;
+  }
+
+  purchase(direction, qty, price) {
+    // Update cash on hand.
+    if (direction === 'buy') {
+      this.position += qty;
+      this.cash -= price * qty;
+    } else {
+      this.position -= qty;
+      this.cash += price * qty;
+    }
+  }
+}
 
 // The amount of money we want to make for this level.
 const goal = 1000000;
@@ -296,7 +346,7 @@ initNetwork(instanceId).then(network => {
     goal: goal,
     network: network,
     state: initState,
-    inventory: initInventory
+    inventory: new Inventory()
   };
   marketMaker(world);
 });
