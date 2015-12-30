@@ -272,48 +272,39 @@ function submitBid(world) {
   var quantity = world.state.get('askSize');
   var price = world.state.get('ask');
 
-  if (price === undefined) {
-    console.log('ask was undefined');
-    return Promise.resolve(world);
-  }
-
-  if (openAsks.isEmpty()) {
+  if (openAsks.isEmpty() || cheapestPrice > price) {
     if (quantity + potentialPosition > 1000) {
         quantity = 1000 - potentialPosition;
     }
-    console.log('Buying ' + quantity + ' shares at ' + price + '.');
-    return bid(venueId, stockId, price, quantity, 'limit').then(updated => {
-        var nextState = world.state.merge({
-            'openBids': updated[0],
-            'openAsks': updated[1]
-        });
-        world.state = nextState;
+    console.log(`Buying ${quantity} shares at ${price}.`);
+    return bid(venueId, stockId, price, quantity, 'limit').then(res => {
+        updateInventory(openBids,res,world);
         return world;
     });
   }
 
-  if (cheapestPrice <= price) {
-    console.log('Price of ' + price + ' is too high. Wanted a price less than ' + ;
-    return Promise.resolve(world);
-  }
-
-  if (cheapestPrice > price) {
-    if (quantity + position > 1000) {
-        quantity = 1000 - position;
-    }
-    console.log('Buying ' + quantity + ' shares at ' + price + '.');
-    return bid(venueId, stockId, price, quantity, 'limit').then(updated => {
-        var nextState = world.state.merge({
-            'openBids': updated[0],
-            'openAsks': updated[1]
-        });
-        world.state = nextState;
-        return world;
-    });
+  console.log(`Price of ${price} is too high. Wanted a price less than ${cheapestPrice}.`);
+  return Promise.resolve(world);
   }
 }
 
 function submitAsk(world) {
+  var venueId = world.network.ids.venues[0];
+  var stockId = world.network.ids.tickers[0];
+  var ownedHeap = world.inventory.ownedHeap;
+  var price = world.state.get('ask');
+  var postPrice = ownedHeap.peek().price + buffer;
+  var quantity = ownedHeap.peek().qty;
+
+  if (price > postPrice) {
+    ownedHeap.dequeue;
+    return ask(venueId, stockId, postPrice, quantity, 'limit').then(res => {
+        updateInventory(openAsks,res,world);
+        return world;
+    })
+    .then(submitAsk);
+  }
+
   return Promise.resolve(world);
 }
 
