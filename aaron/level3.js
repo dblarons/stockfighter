@@ -9,6 +9,7 @@ var Immutable = require('immutable');
 var GM = require('../gm.js');
 var Maybe = require('monet').Maybe;
 var PriorityQueue = require('js-priority-queue');
+var readline = require('readline');
 
 /*
  * Conditions for when to buy
@@ -46,6 +47,9 @@ var positionLimit = 1000;
 // ID specific to the current level. Does not change.
 const instanceId = creds.instances.level3;
 
+// For writing to console.
+var rl = readline.createInterface(process.stdin, process.stdout);
+
 // The driver function that makes markets.
 function marketMaker(world) {
   // Execute a series of functions that mutate the world state. Last call
@@ -65,6 +69,9 @@ function marketMaker(world) {
     }); // repeat process
 }
 
+// First time running through logging code.
+var firstTime = true;
+
 // Log out useful information about the world.
 function logger(world) {
   var venueId = world.network.ids.venues[0];
@@ -78,11 +85,22 @@ function logger(world) {
   var iPosition = world.inventory.position;
   var iNav = world.inventory.nav(world.state.get('last'));
   var delta = iPosition - position;
-  console.log('\n ---- World ----');
-  console.log(`venue: ${venueId} | stock: ${stockId}`);
-  console.log(`bid: ${bid} | ask: ${ask}`);
-  console.log(`cash: ${cash} | position: ${position} | nav: ${nav}`);
-  console.log(`INTERNAL cash: ${iCash} | position: ${iPosition} | nav: ${iNav} | delta: ${delta}`);
+
+  if (firstTime) {
+    firstTime = false;
+  } else {
+    var lines = -6;
+    readline.moveCursor(rl, 0, lines);
+    readline.clearScreenDown(rl);
+  }
+
+  process.stdout.write(
+    `\n          --------------- World ---------------
+    IDS:         venue: ${venueId} | stock: ${stockId}
+    MARKET:      bid: ${bid} | ask: ${ask}
+    BACK OFFICE: cash: ${cash} | position: ${position} | nav: ${nav}
+    INTERNAL:    cash: ${iCash} | position: ${iPosition} | nav: ${iNav} | delta: ${delta}\n`
+  );
   return Promise.resolve(world);
 }
 
