@@ -1,13 +1,11 @@
-/* jshint esnext: true */
-
 var http = require('https');
+var Promise = require('promise');
 var creds = require('./exports.js');
-var API = require('../api.js').API;
 
 var goal = 99999 - 8755;
 var price = 9510;
-var quantity = 500;
-var sellQuantity = 25;
+var quantity = 1000;
+var sellQuantity = 50;
 
 var orderOptions = {
   host: creds.baseUrl,
@@ -19,7 +17,7 @@ var orderOptions = {
 var marketOptions = {
   host: creds.baseUrl,
   path: '/ob/api/venues/' + creds.venue + '/stocks/' + creds.stock + '/quote',
-  headers: {'X-Starfighter-Authorization': creds.apiToken}
+  headers: {'X-Starfighter-Authoriza=tion': creds.apiToken}
 };
 
 // Return a promise for a buy command given options and an order.
@@ -37,12 +35,12 @@ var placeOrder = function(options, order) {
           reject(data.error);
         }
         resolve(data); // resolve the promise with a JSON object of the data
-      }); 
+      });
     });
 
     req.on('error', function(e) {
       reject(e.message); // hit an error; reject the promise and clean up
-    }); 
+    });
 
     // This is the data we are posting; it needs to be a string or a buffer.
     req.write(JSON.stringify(order));
@@ -65,20 +63,21 @@ var peek = function(options) {
           reject(data.error);
         }
         resolve(data); // resolve the promise with a JSON object of the data
-      }); 
+      });
     });
 
     req.on('error', function(e) {
       reject(e.message); // hit an error; reject the promise and clean up
-    }); 
+    });
 
+    // This is the data we are posting; it needs to be a string or a buffer.
     req.end();
   });
 };
 
-// Buy in quantities of a size defined by the quantity constant while the
-// asking price is at or below our goal price until i is 0. Wait if the asking
-// price is too high or the askSize is too small.
+// Buy in quantities of quantity while the asking price is at or below
+// our goal price until i is 0. Wait if the asking price is too high or the
+// askSize is too small.
 function buyMore(i) {
   var buyOrder = {
     'account': creds.account,
@@ -109,11 +108,11 @@ function buyMore(i) {
     return;
   }
 
-  api.getQuote(creds.venueId, creds.stockId).then(res => {
+  peek(marketOptions).then(function(res) {
     if (res.ask === undefined) {
       console.log('res.ask was undefined');
       return Promise.resolve({res: i});
-    }
+
 
     if (res.askSize < quantity) {
       console.log('Only ' + res.askSize + ' shares left, but we wanted ' + quantity + '.');
@@ -137,15 +136,15 @@ function buyMore(i) {
     buyOrder.qty = bidSize;
     sellOrder.price = res.bid;
     sellOrder.qty = sellQuantity;
-    return bid(creds.venueId, creds.stockId, price, quantity, 'limit')
-    .then(ask(...))
-    .then(ask(...))
-    .then(ask(...));
+    return placeOrder(orderOptions, buyOrder)
+      .then(placeOrder(orderOptions, sellOrder))
+      .then(placeOrder(orderOptions, sellOrder))
+      .then(placeOrder(orderOptions, sellOrder));
   })
-  .then(res => {
+  .then(function(res) {
     setTimeout(function() {buyMore(i - res.totalFilled + sellQuantity * 3);}, 400);
   })
-  .catch(err => {
+  .catch(function(err) {
     console.log('Error: ' + err);
   });
 }
