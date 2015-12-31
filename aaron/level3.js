@@ -50,6 +50,9 @@ const instanceId = creds.instances.level3;
 // For writing to console.
 var rl = readline.createInterface(process.stdin, process.stdout);
 
+// Time to wait between marketMaking executions in ms.
+var waitTime = 1000;
+
 // The driver function that makes markets.
 function marketMaker(world) {
   // Execute a series of functions that mutate the world state. Last call
@@ -63,10 +66,20 @@ function marketMaker(world) {
     .then(submitBid)
     .then(submitAsk)
     .then(logger)
+    .then(wait)
     .then(marketMaker)
     .catch(err => {
-      console.log('Error caught in marketMaker: ' + err);
+      console.log(`Error caught in marketMaker: ${err}`);
     }); // repeat process
+}
+
+// Wait for a specified amount of time.
+function wait(world) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      resolve(world);
+    }, waitTime);
+  });
 }
 
 // First time running through logging code.
@@ -89,17 +102,26 @@ function logger(world) {
   if (firstTime) {
     firstTime = false;
   } else {
-    var lines = -6;
+    var lines = -6 - world.logging.prevLength;
     readline.moveCursor(rl, 0, lines);
     readline.clearScreenDown(rl);
   }
+
+  var messages = world.logging.messages.reduce((acc, msg) => {
+    return acc + `    ${msg}\n`;
+  }, ``);
+
+  // Keep track of last messages length for erasing the lines in the next
+  // iteration.
+  world.logging.prevLength = world.logging.messages.length;
 
   process.stdout.write(
     `\n          --------------- World ---------------
     IDS:         venue: ${venueId} | stock: ${stockId}
     MARKET:      bid: ${bid} | ask: ${ask}
     BACK OFFICE: cash: ${cash} | position: ${position} | nav: ${nav}
-    INTERNAL:    cash: ${iCash} | position: ${iPosition} | nav: ${iNav} | delta: ${delta}\n`
+    INTERNAL:    cash: ${iCash} | position: ${iPosition} | nav: ${iNav} | delta: ${delta}
+    ${messages}`
   );
   return Promise.resolve(world);
 }
@@ -136,7 +158,7 @@ function backOfficeUpdate(world) {
     world.state = nextState;
     return world;
   }).catch(err => {
-    console.log("Error thrown in level3->backOfficeUpdate: " + err);
+    console.log(`Error thrown in level3->backOfficeUpdate: ${err}`);
   });
 }
 
@@ -151,19 +173,21 @@ function getQuote(world) {
     var oldBid = world.state.get('bid');
     var oldAsk = world.state.get('ask');
     var oldLast = world.state.get('last');
+    var oldAskSize = world.state.get('askSize');
     var maybeRes = Maybe.Some(res);
 
     // Update new bid / ask prices if they are available.
     var nextState = world.state.merge({
       'bid': maybeRes.bind(r => Maybe.fromNull(r.bid)).orSome(oldBid),
       'ask': maybeRes.bind(r => Maybe.fromNull(r.ask)).orSome(oldAsk),
-      'last': maybeRes.bind(r => Maybe.fromNull(r.last)).orSome(oldLast)
+      'last': maybeRes.bind(r => Maybe.fromNull(r.last)).orSome(oldLast),
+      'askSize': maybeRes.bind(r => Maybe.fromNull(r.askSize)).orSome(oldAskSize)
     });
 
     world.state = nextState;
     return world;
   }).catch(err => {
-    console.log("Error thrown in level3->getQuote: " + err);
+    console.log(`Error thrown in level3->getQuote: ${err}`);
   });
 }
 
@@ -171,6 +195,17 @@ function getQuote(world) {
 // back office and add the fill to our ownedHeap.
 function updateInventory(oldStatus, newStatus, world) {
   newStatus.fills.slice(oldStatus.fills.length).forEach(fill => {
+    world.inventory.purchase(newStatus.direction, fill.qty, fill.price);
+    world.inventory.ownedHeap.queue({
+      price: fill.price,
+      qty: fill.qty,
+      id: newStatus.id
+    });
+  });
+}
+
+function insertNewInventory(newStatus, world) {
+  newStatus.fills.forEach(fill => {
     world.inventory.purchase(newStatus.direction, fill.qty, fill.price);
     world.inventory.ownedHeap.queue({
       price: fill.price,
@@ -189,8 +224,7 @@ function updateOpenOrders(world) {
     return Promise.all(orders.map(order => {
       // Get the latest (already outdated...) data for our orders.
       return world.network.api.getOrderStatus(venueId, stockId, order.id).then(res => {
-        updateInventory(orders.status, res, world); // MUTATION: update internal inventory
-        console.log(world.inventory);
+        updateInventory(order.status, res, world); // MUTATION: update internal inventory
         return {
           id: order.id,
           status: res
@@ -206,7 +240,7 @@ function updateOpenOrders(world) {
         }
       }, Immutable.List()); 
     }).catch(err => {
-      console.log("Error thrown in level3->updateOpenOrders->update: " + err);
+      console.log(`Error thrown in level3->updateOpenOrders->update: ${err}`);
     });
   };
 
@@ -270,11 +304,58 @@ function deleteStaleOrders(world) {
     // were acted upon or not.
     return world;
   }).catch(err => {
-      console.log("Error thrown in level3->deleteStaleOrders: " + err);
+      console.log(`Error thrown in level3->deleteStaleOrders: ${err}`);
   });
 }
 
 function submitBid(world) {
+  var venueId = world.network.ids.venues[0];
+  var stockId = world.network.ids.tickers[0];
+
+  var openBids = world.state.get('openBids');
+  var openAsks = world.state.get('openAsks');
+
+  var potentialPosition = world.inventory.position + openBids.reduce((acc, x) => {
+    return acc + x.status.qty;
+  }, 0);
+
+  if (potentialPosition >= positionLimit) {
+    // Don't buy if we are already at or over capacity.
+    return Promise.resolve(world);
+  }
+
+  var cheapestPrice = openAsks.min((a,b) => {
+    return a.status.price < b.status.price;
+  });
+
+  var quantity = world.state.get('askSize');
+  var price = world.state.get('ask');
+
+  if (openAsks.isEmpty() || cheapestPrice > price) {
+    if (quantity + potentialPosition > positionLimit) {
+      // Don't exceed position limit.
+      quantity = positionLimit - potentialPosition;
+    }
+
+    if (quantity === 0) {
+      return Promise.resolve(world);
+    }
+
+    world.logging.messages.push(`Buying ${quantity} shares at ${price}.`);
+    return world.network.api.bid(venueId, stockId, price, quantity, 'limit').then(res => {
+      insertNewInventory(res, world);
+      var nextState = world.state.update('openBids', s => s.push({
+        id: res.id,
+        status: res
+      }));
+      world.state = nextState;
+      return world;
+    }).catch(err => {
+      world.logging.messages.push(`Error caught in submitBid: ${err}`);
+    });
+  }
+
+  world.logging.messages.push(`Price of ${price} is too high. Wanted a price less than ${cheapestPrice}.`);
   return Promise.resolve(world);
 }
 
@@ -296,7 +377,7 @@ function initNetwork(instanceId) {
       ids: ids
     };
   }).catch(err => {
-    console.log('Error in initNetwork: ' + err);
+    console.log(`Error in initNetwork: ${err}`);
   });
 }
 
@@ -313,6 +394,7 @@ var initState = Immutable.Map({
   bid: 0, // bid price on the market as of last sync
   ask: 0, // ask price on the market as of last sync
   last: 0, // last sale price on the market
+  askSize: 0, // ask size on the market as of last sync
 
   // [{id: 1, status: {...}}, {...}]
   openBids: Immutable.List(), // open buy orders
@@ -364,7 +446,11 @@ initNetwork(instanceId).then(network => {
     goal: goal,
     network: network,
     state: initState,
-    inventory: new Inventory()
+    inventory: new Inventory(),
+    logging: {
+      messages: [],
+      prevLength: 0
+    }
   };
   marketMaker(world);
 });

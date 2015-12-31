@@ -264,11 +264,11 @@ function submitBid(world) {
   var openBids = world.state.get('openBids');
   var openAsks = world.state.get('openAsks');
   var potentialPosition = world.state.get('backOffice').get('position') + openBids.reduce((acc, x) => {
-    return acc + x.status.qty
-    };
+    return acc + x.status.qty;
+  });
   var cheapestPrice = openAsks.min((a,b) => {
     return a.status.price < b.status.price;
-  })
+  });
   var quantity = world.state.get('askSize');
   var price = world.state.get('ask');
 
