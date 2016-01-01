@@ -39,10 +39,10 @@ var readline = require('readline');
 
 // Amount that a bid or ask price is allowed to deviate from the norm bid or
 // ask before deletion.
-var buffer = 50;
+var buffer = 30;
 
 // Highest number of shares you can be positioned with in either direction.
-var positionLimit = 500;
+var positionLimit = 900;
 
 // ID specific to the current level. Does not change.
 const instanceId = creds.instances.level3;
@@ -59,7 +59,7 @@ function marketMaker(world) {
   // should be to marketMaker to repeat the process. All functions passed to
   // .then() should take a single, world, parameter that contains goal,
   // network, and state. It should then return a world for the next handler.
-  backOfficeUpdate(world)
+  gameManagerUpdate(world)
     .then(getQuote)
     .then(updateOpenOrders)
     .then(deleteStaleOrders)
@@ -89,20 +89,22 @@ var firstTime = true;
 function logger(world) {
   var venueId = world.network.ids.venues[0];
   var stockId = world.network.ids.tickers[0];
+  var daysRemaining = world.state.get('daysRemaining');
   var bid = world.state.get('bid');
   var ask = world.state.get('ask');
+  var last = world.state.get('last');
   var cash = world.state.get('backOffice').get('cash');
   var position = world.state.get('backOffice').get('position');
   var nav = world.state.get('backOffice').get('nav');
-  var iCash = world.inventory.cash;
+  var iCash = world.inventory.cash / 100;
   var iPosition = world.inventory.position;
-  var iNav = world.inventory.nav(world.state.get('last'));
+  var iNav = world.inventory.nav(world.state.get('last')) / 100;
   var delta = iPosition - position;
 
   if (firstTime) {
     firstTime = false;
   } else {
-    var lines = -6 - world.logging.prevLength;
+    var lines = -7 - world.logging.prevLength;
     readline.moveCursor(rl, 0, lines);
     readline.clearScreenDown(rl);
   }
@@ -120,7 +122,8 @@ function logger(world) {
   process.stdout.write(
     `\n          --------------- World ---------------
     IDS:         venue: ${venueId} | stock: ${stockId}
-    MARKET:      bid: ${bid} | ask: ${ask}
+    DAYS LEFT:   ${daysRemaining}
+    MARKET:      bid: ${bid} | ask: ${ask} | last: ${last}
     BACK OFFICE: cash: ${cash} | position: ${position} | nav: ${nav}
     INTERNAL:    cash: ${iCash} | position: ${iPosition} | nav: ${iNav} | delta: ${delta}
     ${messages}`
@@ -130,7 +133,7 @@ function logger(world) {
 
 // Get an update from the back office, if one is available, and update the
 // world state.
-function backOfficeUpdate(world) {
+function gameManagerUpdate(world) {
   // Parse the 'flash' message in the GM hidden endpoint to get the cash,
   // position, and nav from the back office.
   var flashParser = function(msg) {
@@ -145,7 +148,12 @@ function backOfficeUpdate(world) {
   };
 
   return world.network.gm.getInstanceStatus(instanceId).then(res => {
-    return Maybe.fromNull(res)
+    var daysRemaining = Maybe.fromNull(res)
+      .bind(msg => Maybe.fromNull(msg.details))
+      .map(d => {
+        return d.endOfTheWorldDay - d.tradingDay;
+      }).orSome(500);
+    var backOffice = Maybe.fromNull(res)
       .bind(msg => Maybe.fromNull(msg.flash))
       .bind(flash => Maybe.fromNull(flash.info))
       .map(flashParser)
@@ -154,13 +162,20 @@ function backOfficeUpdate(world) {
         position: 0,
         nav: 0
       }));
-  }).then(backOffice => {
+    return {
+      daysRemaining: daysRemaining,
+      backOffice: backOffice
+    };
+  }).then(instanceUpdate => {
     // Update state once transaction is complete
-    var nextState = world.state.set('backOffice', backOffice);
+    var nextState = world.state.merge({
+      'backOffice': instanceUpdate.backOffice,
+      'daysRemaining': instanceUpdate.daysRemaining
+    });
     world.state = nextState;
     return world;
   }).catch(err => {
-    console.log(`Error thrown in level3->backOfficeUpdate: ${err}`);
+    console.log(`Error thrown in level3->gameManagerUpdate: ${err}`);
   });
 }
 
@@ -176,6 +191,8 @@ function getQuote(world) {
     var oldAsk = world.state.get('ask');
     var oldLast = world.state.get('last');
     var oldAskSize = world.state.get('askSize');
+    var oldBidDepth = world.state.get('bidDepth');
+    var oldAskDepth = world.state.get('askDepth');
     var maybeRes = Maybe.Some(res);
 
     // Update new bid / ask prices if they are available.
@@ -183,7 +200,9 @@ function getQuote(world) {
       'bid': maybeRes.bind(r => Maybe.fromNull(r.bid)).orSome(oldBid),
       'ask': maybeRes.bind(r => Maybe.fromNull(r.ask)).orSome(oldAsk),
       'last': maybeRes.bind(r => Maybe.fromNull(r.last)).orSome(oldLast),
-      'askSize': maybeRes.bind(r => Maybe.fromNull(r.askSize)).orSome(oldAskSize)
+      'askSize': maybeRes.bind(r => Maybe.fromNull(r.askSize)).orSome(oldAskSize),
+      'bidDepth': maybeRes.bind(r => Maybe.fromNull(r.bidDepth)).orSome(oldBidDepth),
+      'askDepth': maybeRes.bind(r => Maybe.fromNull(r.askDepth)).orSome(oldAskDepth)
     });
 
     world.state = nextState;
@@ -326,9 +345,10 @@ function submitBid(world) {
     return Promise.resolve(world);
   }
 
-  var cheapestPrice = openAsks.min((a,b) => {
+  var cheapestPrice = Maybe.fromNull(openAsks.min((a,b) => {
     return a.status.price < b.status.price;
-  });
+  })).bind(cheapest => Maybe.fromNull(cheapest.status.price))
+     .orSome(0);
 
   var quantity = world.state.get('askSize');
   var price = world.state.get('ask');
@@ -369,8 +389,10 @@ function submitAsk(world) {
   var stockId = world.network.ids.tickers[0];
 
   var price = world.state.get('ask');
+  var bid = world.state.get('bid');
   var openAsks = world.state.get('openAsks');
   var ownedHeap = world.inventory.ownedHeap;
+  var askDepth = world.state.get('askDepth');
 
   var askList = []; // hold all the asks we'll place
 
@@ -383,7 +405,12 @@ function submitAsk(world) {
     var postPrice = cheapestOwned.price + buffer;
     var qty = cheapestOwned.qty;
 
-    if (price < postPrice) {
+    if (askDepth === 0) {
+      // Should post a higher price if there are no other offers on the market.
+      postPrice = Math.max(postPrice, bid + buffer);
+    }
+
+    if (price < postPrice && askDepth !== 0) {
       world.logging.messages.push('Market asking price is too low to sell these shares');
       break;
     }
@@ -445,10 +472,15 @@ var initState = Immutable.Map({
     nav: 0
   }),
 
+  daysRemaining: 500,
+
   bid: 0, // bid price on the market as of last sync
   ask: 0, // ask price on the market as of last sync
   last: 0, // last sale price on the market
+
   askSize: 0, // ask size on the market as of last sync
+  bidDepth: 0, // aggregate size of *all bids*
+  askDepth: 0, // aggregate size of *all asks*
 
   // [{id: 1, status: {...}}, {...}]
   openBids: Immutable.List(), // open buy orders
