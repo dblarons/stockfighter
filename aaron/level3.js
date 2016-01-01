@@ -42,7 +42,7 @@ var readline = require('readline');
 var buffer = 50;
 
 // Highest number of shares you can be positioned with in either direction.
-var positionLimit = 1000;
+var positionLimit = 500;
 
 // ID specific to the current level. Does not change.
 const instanceId = creds.instances.level3;
@@ -107,13 +107,15 @@ function logger(world) {
     readline.clearScreenDown(rl);
   }
 
-  var messages = world.logging.messages.reduce((acc, msg) => {
-    return acc + `    ${msg}\n`;
+  var messagesLen = world.logging.messages.length;
+  var recentMessages = world.logging.messages.slice(messagesLen - 10);
+  var messages = recentMessages.reduce((acc, msg) => {
+    return acc + `${msg}\n    `;
   }, ``);
 
   // Keep track of last messages length for erasing the lines in the next
   // iteration.
-  world.logging.prevLength = world.logging.messages.length;
+  world.logging.prevLength = recentMessages.length;
 
   process.stdout.write(
     `\n          --------------- World ---------------
@@ -359,8 +361,60 @@ function submitBid(world) {
   return Promise.resolve(world);
 }
 
+// Create ask requests for all quantities of owned stock as long as the price
+// is less than the minimum market asking price and the max ask inventory is
+// not exceeded. Execute all requests asynchronously.
 function submitAsk(world) {
-  return Promise.resolve(world);
+  var venueId = world.network.ids.venues[0];
+  var stockId = world.network.ids.tickers[0];
+
+  var price = world.state.get('ask');
+  var openAsks = world.state.get('openAsks');
+  var ownedHeap = world.inventory.ownedHeap;
+
+  var askList = []; // hold all the asks we'll place
+
+  var potentialPosition = world.inventory.position - openAsks.reduce((acc, x) => {
+    return acc + x.status.qty;
+  }, 0);
+
+  while (ownedHeap.length > 0) {
+    var cheapestOwned = ownedHeap.peek();
+    var postPrice = cheapestOwned.price + buffer;
+    var qty = cheapestOwned.qty;
+
+    if (price < postPrice) {
+      world.logging.messages.push('Market asking price is too low to sell these shares');
+      break;
+    }
+
+    if (potentialPosition - cheapestOwned.qty < -positionLimit) {
+      world.logging.messages.push('Position is leaning too far toward selling');
+      break; // don't purchase for bad prices or when exceeding position limit
+    }
+
+    ownedHeap.dequeue();
+
+    world.logging.messages.push(`Selling ${qty} shares at ${postPrice}.`);
+    var newAsk = world.network.api.ask(venueId, stockId, postPrice, qty, 'limit').then(res => {
+      insertNewInventory(res, world);
+      return {
+        id: res.id,
+        status: res
+      };
+    });
+    askList.push(newAsk);
+  }
+
+  // Add the newly placed ask orders to the openAsks in state.
+  return Promise.all(askList).then(newAskOrders => {
+    var updatedOpenAsks = newAskOrders.reduce((acc, order) => {
+      return acc.push(order);
+    }, world.state.get('openAsks'));
+
+    world.state = world.state.set('openAsks', updatedOpenAsks);
+    return world;
+  });
 }
 
 // Create API clients for injection. API client depends on GM because GM gets
