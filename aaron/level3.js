@@ -39,10 +39,10 @@ var readline = require('readline');
 
 // Amount that a bid or ask price is allowed to deviate from the norm bid or
 // ask before deletion.
-var buffer = 30;
+var buffer = 38;
 
 // Highest number of shares you can be positioned with in either direction.
-var positionLimit = 900;
+var positionLimit = 500;
 
 // ID specific to the current level. Does not change.
 const instanceId = creds.instances.level3;
@@ -416,9 +416,12 @@ function submitAsk(world) {
     }
 
     if (potentialPosition - cheapestOwned.qty < -positionLimit) {
-      world.logging.messages.push('Position is leaning too far toward selling');
+      world.logging.messages.push('Our position is too far short to sell more shares');
       break; // don't purchase for bad prices or when exceeding position limit
     }
+
+    // Sell as close to the current market ask price as possible.
+    postPrice = Math.max(postPrice - 1, postPrice);
 
     ownedHeap.dequeue();
 
