@@ -1,8 +1,35 @@
 /* jshint esnext: true */
 /* jshint node: true */
 
+/**
+ * bmac:
+ * 
+ * If you are using node, then you might want to use the es6 features.
+ * "let" instead of "var" to declar variables, "let" gives you block scope which is a lot less
+ * confusing and easier to debug than javascript's traditional function scope.
+ * 
+ * "const" to declare your constants, which detect if you try to reassign variables that should
+ * not be reassigned
+ */
+
 "use strict";
 
+/**
+ * bmac:
+ * It's good coding practice to alphabetize your require statements and separate lower-case with capital ones.
+ * They are a lot easier to find when the list gets large. Also, you do not need to use .js:
+ * 
+ * const API = require('../api');
+ * const GM = require('../gm');
+ * const Immutable = require('immutable');
+ * const Monet = require('monet');
+ * const PriorityQueue = reuqire('js-priority-queue');
+ *
+ * const creds = require('./exports');
+ * const readline = require('readline');
+ * 
+ * const {Maybe} = Monet; // Object deconstruction, es6 feature
+ */
 var creds = require('./exports.js');
 var API = require('../api.js');
 var Immutable = require('immutable');
@@ -37,6 +64,14 @@ var readline = require('readline');
  *  - Stop once net > 10000
  */
 
+/**
+ * bmac:
+ * For constants, capitalize them and use the constant keyword:
+ * 
+ * const BUFFER = 38;
+ * const POSITION_LIMIT = 500;
+ * ...
+ */
 // Amount that a bid or ask price is allowed to deviate from the norm bid or
 // ask before deletion.
 var buffer = 38;
@@ -162,6 +197,11 @@ function gameManagerUpdate(world) {
         position: 0,
         nav: 0
       }));
+      /**
+       * bmac:
+       * Object construction here:
+       * return {daysRemaining, backOffice};
+       */
     return {
       daysRemaining: daysRemaining,
       backOffice: backOffice
