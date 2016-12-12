@@ -1,3 +1,5 @@
+This repo was previously private, but stockfighter is being shut down. My friend Carl and I attempted a few of the problems over a winter break.
+
 ### API
 
 ```javascript
